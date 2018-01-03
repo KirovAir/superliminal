@@ -4,9 +4,11 @@ import logging
 import subprocess
 from flask import Flask, abort, request
 
-CFG_DIR = 'config/' 
-if (os.path.isdir('/config')):
-    CFG_DIR = '/config/'
+CFG_DIR = '/config/' 
+if not os.path.isdir(CFG_DIR):
+    CFG_DIR = 'config/'
+    if not os.path.isdir(CFG_DIR):
+        os.makedirs(CFG_DIR)
 
 CFG_FILE = CFG_DIR + 'arguments.txt'
 SUBLIMINAL_LOG = CFG_DIR + 'subliminal_output.log'
@@ -33,13 +35,13 @@ def index():
     
     mediaFile = ''
     isMovie = False
-    if request.json.get('movieFile'):
+    if request.json.get('movieFile') and request.json.get('movie'):
         isMovie = True
         logging.info('Got moviefile!')
-        mediaFile = request.json['movieFile']['path']
-    if request.json.get('episodeFile'):
+        mediaFile = os.path.join(request.json['movie']['folderPath'], request.json['movieFile']['relativePath'])
+    if request.json.get('episodeFile') and request.json.get('series'):
         logging.info('Got episodefile!')
-        mediaFile = request.json['episodeFile']['path']
+        mediaFile = os.path.join(request.json['series']['path'], request.json['episodeFile']['relativePath'])
 
     if not mediaFile:
         logging.warn('No mediafile found in request')
