@@ -1,0 +1,71 @@
+import json
+import os
+import logging
+import subprocess
+from flask import Flask, abort, request
+
+CFG_DIR = 'config/' 
+if (os.path.isdir('/config')):
+    CFG_DIR = '/config/'
+
+CFG_FILE = CFG_DIR + 'arguments.txt'
+SUBLIMINAL_LOG = CFG_DIR + 'subliminal_output.log'
+
+if not os.path.exists(CFG_FILE):
+    with open(CFG_FILE, 'w') as outfile:
+        data = {'default':r'--cache-dir /config --addic7ed <user> <pass> --opensubtitles <user> <pass> download -p addic7ed -p opensubtitles -l en -m 85 -v "#FILE#"',
+        'sonarr':None,
+        'radarr':None}
+        outfile.write(json.dumps(data, indent=4))
+
+logging.basicConfig(filename=CFG_DIR + 'web.log',level=logging.DEBUG)
+app = Flask(__name__)
+
+@app.route('/', methods=['POST'])
+def index():
+    if not request.json:
+        abort(400)
+    eventype = request.json['eventType']
+
+    logging.debug(request.data)
+    if eventype == 'Test':
+        return 'Test'
+    
+    mediaFile = ''
+    isMovie = False
+    if request.json.get('movieFile'):
+        isMovie = True
+        logging.info('Got moviefile!')
+        mediaFile = request.json['movieFile']['path']
+    if request.json.get('episodeFile'):
+        logging.info('Got episodefile!')
+        mediaFile = request.json['episodeFile']['path']
+
+    if not mediaFile:
+        logging.warn('No mediafile found in request')
+
+    logging.debug('Mediafile: ' + mediaFile)
+
+    data = json.load(open(CFG_FILE))
+    
+    cmd = data.get('radarr') if isMovie else data.get('sonarr')
+    if not cmd:
+        cmd = data.get('default')
+
+    if not cmd:
+        logging.warn('cmd line is empty, aborting')
+        abort(400)
+
+    cmd = 'subliminal ' + cmd.replace('#FILE#', mediaFile)
+    logging.debug('CMD: ' + cmd)
+    #os.system(cmd)
+    
+    try:
+        with open(SUBLIMINAL_LOG, 'a') as outfile:
+            subprocess.call(cmd, stdout=outfile, stderr=outfile, shell=True)
+    except Exception as e:
+        logging.error(e)
+    return 'Ok :)'
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=8978)
